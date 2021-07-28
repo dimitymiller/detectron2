@@ -64,24 +64,17 @@ def get_parser():
         metavar="FILE",
         help="path to config file",
     )
-    parser.add_argument("--webcam", action="store_true", help="Take inputs from webcam.")
-    parser.add_argument("--video-input", help="Path to video file.")
-    parser.add_argument(
-        "--input",
-        nargs="+",
-        help="A list of space separated input images; "
-        "or a single glob pattern such as 'directory/*.jpg'",
-    )
-    parser.add_argument(
-        "--output",
-        help="A file or directory to save output visualizations. "
-        "If not given, will show output in an OpenCV window.",
-    )
     parser.add_argument(
         "--confidence-threshold",
         type=float,
         default=0.1,
         help="Minimum score for instance predictions to be shown",
+    )
+    parser.add_argument(
+        "--object",
+        type=str,
+        default='cup',
+        help="Which object in objectron are we testing?",
     )
     parser.add_argument(
         "--dataSave",
@@ -99,14 +92,14 @@ def get_parser():
         "--batch",
         type=int,
         default=None,
-        help="Do you want to save the raw detections",
+        help="Test a specific batch?",
     )
 
     parser.add_argument(
         "--vidNum",
         type=int,
         default=None,
-        help="Do you want to save the raw detections",
+        help="Test a specific video number?",
     )
     parser.add_argument(
         "--opts",
@@ -134,7 +127,7 @@ def test_opencv_video_format(codec, file_ext):
         return False
 
 lists_root_path = '../../Objectron/index'
-data_root = '../data/objectron/'
+data_root = '../../data/objectron/'
 def get_paths(data_root, subset, classNm = 'cup', batch = 'batch-1'):
     allNums = []
     with open(osp.join(lists_root_path, f'{classNm}_annotations_{subset}'), 'r') as f:
@@ -148,13 +141,13 @@ def get_paths(data_root, subset, classNm = 'cup', batch = 'batch-1'):
 def get_anno(ann_path):
     ann = load_annotation_sequence(ann_path)
     for item in ann:
-        item[2] = 'cup'
+        item[2] = args.object
     assert len(ann) > 0
 
     return ann
 
 
-
+#taken from objectron github
 def get_frame_annotation(sequence, frame_id):
     """Grab an annotated frame from the sequence."""
     data = sequence.frame_annotations[frame_id]
@@ -224,56 +217,48 @@ if __name__ == "__main__":
 
     demo = VisualizationDemoObjectron(cfg)
     
-    baseFolder = '../datasets/data/objectron/videos/cup/'
-    for bNum in [i for i in range(1, 6)]:
+    baseFolder = f'../../data/objectron/videos/{args.object}/'
+
+    allBatches = {
+        'bike': [i for i in range(0, 14)],
+        'book': [i for i in range(1, 52)], 
+        'bottle': [i for i in range(1, 47)],
+        'chair': [i for i in range(1, 47)],
+        'cup': [i for i in range(1, 50)],
+        'laptop': [i for i in range(0, 40)]
+    }
+    
+    ################################################################ go through every batch for this object
+    for bNum in allBatches[args.object]:
         if args.batch != None:
             if bNum != args.batch:
                 continue
         bName = f'batch-{bNum}'
-        folderPaths = get_paths(data_root, 'train', 'cup', bName)
+        folderPaths = get_paths(data_root, 'train', args.object, bName)
         allResults = {}
+
+        ################################################################ go through every video in this batch
         for idx, video_input in enumerate(tqdm.tqdm([baseFolder+'{}/video.MOV'.format(i) for i in folderPaths], total = len(folderPaths))):
             if args.batch != None and args.vidNum != None:
                 expectedNm = f'batch-{args.batch}/{args.vidNum}'
                 if expectedNm != folderPaths[idx]:
                     continue
-
-            ## get annotation
+       
+            
+            
+            
+            ################################################################ get annotation and video
             allResults[video_input] = {}
-            print(f'Grabbing annotation for {video_input}')
-            allAnnotations = get_anno(f'../datasets/data/objectron/annotations/cup/{folderPaths[idx]}.pbdata')
+            allAnnotations = get_anno(f'../../data/objectron/annotations/{args.object}/{folderPaths[idx]}.pbdata')
 
             video = cv2.VideoCapture(video_input)
+           
             width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
             frames_per_second = video.get(cv2.CAP_PROP_FPS)
             num_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-           # print(video_input)
-           # exit()
-            basename = os.path.basename(video_input)
-            codec, file_ext = (
-                ("x264", ".mkv") if test_opencv_video_format("x264", ".mkv") else ("mp4v", ".mp4")
-            )
-            if codec == ".mp4v":
-                warnings.warn("x264 codec not available, switching to mp4v")
-            if args.output:
-                if os.path.isdir(args.output):
-                    output_fname = os.path.join(args.output, basename)
-                    output_fname = os.path.splitext(output_fname)[0] + file_ext
-                else:
-                    output_fname = args.output
-                assert not os.path.isfile(output_fname), output_fname
-                output_file = cv2.VideoWriter(
-                    filename=output_fname,
-                    # some installation of opencv may not support x264 (due to its license),
-                    # you can try other format (e.g. MPEG)
-                    fourcc=cv2.VideoWriter_fourcc(*codec),
-                    fps=float(frames_per_second),
-                    frameSize=(width, height),
-                    isColor=True,
-                )
-            assert os.path.isfile(video_input)
-            #print("h1")
+
+            ############################################################## extract a rough 2D bounding boxes from annotation
             bboxAnnotations = []
             for annoIdx, anno in enumerate(allAnnotations):
                 annotation, annotation3D, cat, num_keypoints, types = anno
@@ -282,28 +267,30 @@ if __name__ == "__main__":
                 bbox = [int(np.min(xCoords)*width), int(np.min(yCoords)*height), int(np.max(xCoords)*width), int(np.max(yCoords)*height)]
                 bboxAnnotations += [bbox]
 
-
             
-            #print("h2")
+            ################################ run on frames and get video
             allVisFrames = demo.run_on_video(video, bboxAnnotations)
 
 
-            #print("h3")
+
             if args.visSave:
                 cv2.namedWindow(basename, cv2.WINDOW_NORMAL)
                 cv2.resizeWindow(basename, 1200,1200)
-                #print('no')
+
+            ################################ save results and visualise if set to true
             for frameIdx, (vis_frame, predictions) in enumerate(allVisFrames):
                 allResults[video_input][frameIdx] = {}
                 allResults[video_input][frameIdx]['scores'] = predictions['instances'].scores.cpu().tolist()
                 allResults[video_input][frameIdx]['pred_classes'] =  predictions['instances'].pred_classes.cpu().tolist()
                 allResults[video_input][frameIdx]['boxes'] =  predictions['instances'].pred_boxes.tensor.cpu().tolist()
-                #print(predictions['features'])
-                #exit()
-                allResults[video_input][frameIdx]['features'] =  predictions['features'].cpu().tolist()
+
+                # allResults[video_input][frameIdx]['allFeatures'] =  predictions['allFeatures'].cpu().tolist()
+                allResults[video_input][frameIdx]['predIndices'] =  predictions['predIndices'][0].cpu().tolist()
+                feats = predictions['allFeatures'][predictions['predIndices']]
+                allResults[video_input][frameIdx]['feats'] = feats.cpu().tolist()
                 bbox = bboxAnnotations[frameIdx]
                 allResults[video_input][frameIdx]['gtBox'] =  bbox
-            
+
                 allCols = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255)]
                 if args.visSave:
                     strList = []
@@ -334,15 +321,15 @@ if __name__ == "__main__":
                         break  # k to break
                     if k == 27:
                         exit()  # esc to quit
-                # exit()
+
+
+        ####################### save data
         if args.dataSave:
-            with open('../results/objectron/cup/{}wFeatures.json'.format(bName), 'w') as f:
+            with open(f'../../results/objectron/raw/{args.object}/{bName}wFeaturesTrainData.json', 'w') as f:
                 json.dump(allResults, f)
 
         video.release()
-        if args.output:
-            output_file.release()
-        else:
+        if args.visSave:
             cv2.destroyAllWindows()
 
      

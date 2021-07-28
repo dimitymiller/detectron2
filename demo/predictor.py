@@ -297,10 +297,9 @@ class VisualizationDemoObjectron(object):
                 features_ = [features[f] for f in self.predictor.model.roi_heads.box_in_features]
      
                 box_features = self.predictor.model.roi_heads.box_pooler(features_, [x.proposal_boxes for x in proposals])
-          
+               
                 box_features = self.predictor.model.roi_heads.box_head(box_features)  # features of all 1k candidates
-                print(self.predictor.model.roi_heads)
-                exit()
+                
                 predictions = self.predictor.model.roi_heads.box_predictor(box_features)
                 pred_instances, pred_inds = self.predictor.model.roi_heads.box_predictor.inference(predictions, proposals)
                 pred_instances = self.predictor.model.roi_heads.forward_with_given_boxes(features, pred_instances)
@@ -308,7 +307,9 @@ class VisualizationDemoObjectron(object):
                 predictions = self.predictor.model._postprocess(pred_instances, inputs, images.image_sizes)[0]  # scale box to orig size
 
                 feats = box_features[pred_inds]
-                predictions['features'] = feats 
+                # predictions['features'] = feats 
+                predictions['allFeatures'] = box_features
+                predictions['predIndices'] = pred_inds
                 if gt != None and len(predictions['instances'].scores) > 0:
                     #iou greater than 0.3 and at least 80% of mass inside
                     
@@ -320,8 +321,8 @@ class VisualizationDemoObjectron(object):
                     predictions['instances'] = predictions['instances'][mask]
                     feats = feats[mask]
 
-                    predictions['features'] = feats
-
+                    # predictions['features'] = feats
+                    
                     #gt bbox area
                     # gtArea = (gt[frameIdx][2]-gt[frameIdx][0])*(gt[frameIdx][3]-gt[frameIdx][1])
                     # predArea = predictions['instances'].pred_boxes.area()

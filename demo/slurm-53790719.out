@@ -1,0 +1,3 @@
+[32m[07/28 11:49:34 detectron2]: [0mArguments: Namespace(config_file='../configs/COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml', confidence_threshold=0.3, object='cup', dataSave=True, visSave=False, batch=None, vidNum=None, opts=['MODEL.WEIGHTS', '../weights/model_final_280758.pkl'])
+[32m[07/28 11:49:37 fvcore.common.checkpoint]: [0mLoading checkpoint from ../weights/model_final_280758.pkl
+[32m[07/28 11:49:37 fvcore.common.checkpoint]: [0mReading a file from 'Detectron2 Model Zoo'
