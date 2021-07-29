@@ -1,10 +1,0 @@
-[32m[07/28 11:44:43 detectron2]: [0mArguments: Namespace(config_file='../configs/COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml', confidence_threshold=0.3, object='cup', dataSave=True, visSave=False, batch=None, vidNum=None, opts=['MODEL.WEIGHTS', '../weights/model_final_280758.pkl'])
-[32m[07/28 11:44:46 fvcore.common.checkpoint]: [0mLoading checkpoint from ../weights/model_final_280758.pkl
-[32m[07/28 11:44:46 fvcore.common.checkpoint]: [0mReading a file from 'Detectron2 Model Zoo'
-  0%|          | 0/39 [00:00<?, ?it/s]  3%|▎         | 1/39 [00:22<14:09, 22.35s/it]  5%|▌         | 2/39 [00:33<09:32, 15.47s/it]  5%|▌         | 2/39 [00:33<10:10, 16.51s/it]
-  0%|          | 0/39 [00:00<?, ?it/s]  3%|▎         | 1/39 [00:14<09:23, 14.82s/it]  5%|▌         | 2/39 [01:19<27:18, 44.28s/it]  5%|▌         | 2/39 [01:19<24:34, 39.86s/it]
-  0%|          | 0/37 [00:00<?, ?it/s]  3%|▎         | 1/37 [00:18<11:07, 18.53s/it]  5%|▌         | 2/37 [00:41<12:28, 21.38s/it]  5%|▌         | 2/37 [00:41<12:13, 20.95s/it]
-  0%|          | 0/35 [00:00<?, ?it/s]  3%|▎         | 1/35 [00:23<13:04, 23.07s/it]  6%|▌         | 2/35 [00:45<12:24, 22.55s/it]  6%|▌         | 2/35 [00:45<12:26, 22.63s/it]
-srun: Job step aborted: Waiting up to 122 seconds for job step to finish.
-slurmstepd: error: *** JOB 53790711 ON b036 CANCELLED AT 2021-07-28T11:49:14 ***
-  0%|          | 0/40 [00:00<?, ?it/s]  2%|▎         | 1/40 [00:29<19:08, 29.45s/it]slurmstepd: error: *** STEP 53790711.0 ON b036 CANCELLED AT 2021-07-28T11:49:14 ***

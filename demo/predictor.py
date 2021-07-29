@@ -291,13 +291,132 @@ class VisualizationDemoObjectron(object):
                 images = self.predictor.model.preprocess_image(inputs)
                
     
-                features = self.predictor.model.backbone(images.tensor)  # set of cnn features
-                proposals, _ = self.predictor.model.proposal_generator(images, features, None)  # RPN
-
-                features_ = [features[f] for f in self.predictor.model.roi_heads.box_in_features]
-     
-                box_features = self.predictor.model.roi_heads.box_pooler(features_, [x.proposal_boxes for x in proposals])
+                features = self.predictor.model.backbone(images.tensor)  # set of cnn features across different scales, each scale is 256xsomething1xsomething2
                
+                proposals, _ = self.predictor.model.proposal_generator(images, features, None)  # RPN, generates a set of 1000 proposal bboxes and their objectness logit
+
+                features_ = [features[f] for f in self.predictor.model.roi_heads.box_in_features] #collects the features that are roi in features (leaves out p6?)
+
+     
+                box_features = self.predictor.model.roi_heads.box_pooler(features_, [x.proposal_boxes for x in proposals]) #taking in features and proposed bboxes and outputting 1000x256x7x7
+                ##essentially finds the levels of the 1000 boxes
+                ##then takes in those boxes and the features from that level and 
+                ## uses roi align to pool into a 7x7 feature map for each of the 256 features
+               
+                #######
+                # box_lists = [x.proposal_boxes for x in proposals]
+                # x = features_
+                # from typing import List 
+                # from detectron2.layers import cat, nonzero_tuple
+                # from detectron2.structures import Boxes            
+                # def assign_boxes_to_levels(
+                #     box_lists: List[Boxes],
+                #     min_level: int,
+                #     max_level: int,
+                #     canonical_box_size: int,
+                #     canonical_level: int,
+                # ):
+                #     """
+                #     Map each box in `box_lists` to a feature map level index and return the assignment
+                #     vector.
+
+                #     Args:
+                #         box_lists (list[Boxes] | list[RotatedBoxes]): A list of N Boxes or N RotatedBoxes,
+                #             where N is the number of images in the batch.
+                #         min_level (int): Smallest feature map level index. The input is considered index 0,
+                #             the output of stage 1 is index 1, and so.
+                #         max_level (int): Largest feature map level index.
+                #         canonical_box_size (int): A canonical box size in pixels (sqrt(box area)).
+                #         canonical_level (int): The feature map level index on which a canonically-sized box
+                #             should be placed.
+
+                #     Returns:
+                #         A tensor of length M, where M is the total number of boxes aggregated over all
+                #             N batch images. The memory layout corresponds to the concatenation of boxes
+                #             from all images. Each element is the feature map index, as an offset from
+                #             `self.min_level`, for the corresponding box (so value i means the box is at
+                #             `self.min_level + i`).
+                #     """
+                #     box_sizes = torch.sqrt(cat([boxes.area() for boxes in box_lists]))
+
+                #     # Eqn.(1) in FPN paper
+                #     level_assignments = torch.floor(
+                #         canonical_level + torch.log2(box_sizes / canonical_box_size + 1e-8)
+                #     )
+                #     # clamp level to (min, max), in case the box size is too large or too small
+                #     # for the available feature maps
+                #     level_assignments = torch.clamp(level_assignments, min=min_level, max=max_level)
+                #     return level_assignments.to(torch.int64) - min_level
+
+
+                # def _fmt_box_list(box_tensor, batch_index: int):
+                #     repeated_index = torch.full_like(
+                #         box_tensor[:, :1], batch_index, dtype=box_tensor.dtype, device=box_tensor.device
+                #     )
+                #     return cat((repeated_index, box_tensor), dim=1)
+
+
+                # def convert_boxes_to_pooler_format(box_lists: List[Boxes]):
+                #     """
+                #     Convert all boxes in `box_lists` to the low-level format used by ROI pooling ops
+                #     (see description under Returns).
+
+                #     Args:
+                #         box_lists (list[Boxes] | list[RotatedBoxes]):
+                #             A list of N Boxes or N RotatedBoxes, where N is the number of images in the batch.
+
+                #     Returns:
+                #         When input is list[Boxes]:
+                #             A tensor of shape (M, 5), where M is the total number of boxes aggregated over all
+                #             N batch images.
+                #             The 5 columns are (batch index, x0, y0, x1, y1), where batch index
+                #             is the index in [0, N) identifying which batch image the box with corners at
+                #             (x0, y0, x1, y1) comes from.
+                #         When input is list[RotatedBoxes]:
+                #             A tensor of shape (M, 6), where M is the total number of boxes aggregated over all
+                #             N batch images.
+                #             The 6 columns are (batch index, x_ctr, y_ctr, width, height, angle_degrees),
+                #             where batch index is the index in [0, N) identifying which batch image the
+                #             rotated box (x_ctr, y_ctr, width, height, angle_degrees) comes from.
+                #     """
+                #     pooler_fmt_boxes = cat(
+                #         [_fmt_box_list(box_list.tensor, i) for i, box_list in enumerate(box_lists)], dim=0
+                #     )
+
+                #     return pooler_fmt_boxes
+                                
+
+                # pooler_fmt_boxes = convert_boxes_to_pooler_format(box_lists)
+
+                # if len(self.predictor.model.roi_heads.box_pooler.level_poolers) == 1:
+                #     return self.predictor.model.roi_heads.box_pooler.level_poolers[0](x[0], pooler_fmt_boxes)
+
+                # level_assignments = assign_boxes_to_levels(
+                #     box_lists, self.predictor.model.roi_heads.box_pooler.min_level, self.predictor.model.roi_heads.box_pooler.max_level, 
+                #     self.predictor.model.roi_heads.box_pooler.canonical_box_size, self.predictor.model.roi_heads.box_pooler.canonical_level
+                # )
+
+                # num_boxes = pooler_fmt_boxes.size(0)
+                # num_channels = x[0].shape[1]
+                # output_size = self.predictor.model.roi_heads.box_pooler.output_size[0]
+
+                # dtype, device = x[0].dtype, x[0].device
+                # output = torch.zeros(
+                #     (num_boxes, num_channels, output_size, output_size), dtype=dtype, device=device
+                # )
+
+                # for level, pooler in enumerate(self.predictor.model.roi_heads.box_pooler.level_poolers):
+                    
+                #     inds = nonzero_tuple(level_assignments == level)[0]
+                #     pooler_fmt_boxes_level = pooler_fmt_boxes[inds]
+                #     # Use index_put_ instead of advance indexing, to avoid pytorch/issues/49852
+                #     output.index_put_((inds,), pooler(x[level], pooler_fmt_boxes_level))
+                #     if level == 3:
+                #         print(output[inds[0],0])
+                #         print(x[level][0, 0])
+                        
+                # exit()
+                ##########################
                 box_features = self.predictor.model.roi_heads.box_head(box_features)  # features of all 1k candidates
                 
                 predictions = self.predictor.model.roi_heads.box_predictor(box_features)
@@ -307,31 +426,25 @@ class VisualizationDemoObjectron(object):
                 predictions = self.predictor.model._postprocess(pred_instances, inputs, images.image_sizes)[0]  # scale box to orig size
 
                 feats = box_features[pred_inds]
-                # predictions['features'] = feats 
-                predictions['allFeatures'] = box_features
+                predictions['features'] = []
+                # predictions['allFeatures'] = box_features
                 predictions['predIndices'] = pred_inds
                 if gt != None and len(predictions['instances'].scores) > 0:
-                    #iou greater than 0.3 and at least 80% of mass inside
-                    
-                    ious, overlap = self.bbox_iou(torch.Tensor(gt[frameIdx]).cuda(), predictions['instances'].pred_boxes.tensor)
-                    mask = ious >= 0.2
-                    predictions['instances'] = predictions['instances'][mask]
-                    feats = feats[mask]
-                    mask = overlap[mask] >= 0.8
-                    predictions['instances'] = predictions['instances'][mask]
-                    feats = feats[mask]
+                    #iou greater than 0.2 and at least 80% of mass inside
+                    if len(gt[frameIdx]) == 0:
+                        predictions['instances'] = []
+                    else:
+                        ious, overlap = self.bbox_iou(torch.Tensor(gt[frameIdx]).cuda(), predictions['instances'].pred_boxes.tensor)
+                        mask = ious >= 0.2
+                        predictions['instances'] = predictions['instances'][mask]
+                        feats = feats[mask]
+                        mask = overlap[mask] >= 0.8
+                        predictions['instances'] = predictions['instances'][mask]
+                        feats = feats[mask]
 
-                    # predictions['features'] = feats
+                        predictions['features'] = feats
                     
-                    #gt bbox area
-                    # gtArea = (gt[frameIdx][2]-gt[frameIdx][0])*(gt[frameIdx][3]-gt[frameIdx][1])
-                    # predArea = predictions['instances'].pred_boxes.area()
-                    # areaRatio = predArea/gtArea
-
-                    # mask = areaRatio < 1.
-                    # print(areaRatio)
-                    # predictions['instances'] = predictions['instances'][mask]
-                
+                   
                 yield frame, predictions#process_predictions(frame, predictions)
 
 class AsyncPredictor:

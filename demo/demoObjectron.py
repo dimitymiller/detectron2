@@ -222,7 +222,7 @@ if __name__ == "__main__":
     allBatches = {
         'bike': [i for i in range(0, 14)],
         'book': [i for i in range(1, 52)], 
-        'bottle': [i for i in range(1, 47)],
+        'bottle': [i for i in range(1, 47)], #bottle failed on 36
         'chair': [i for i in range(1, 47)],
         'cup': [i for i in range(1, 50)],
         'laptop': [i for i in range(0, 40)]
@@ -262,9 +262,13 @@ if __name__ == "__main__":
             bboxAnnotations = []
             for annoIdx, anno in enumerate(allAnnotations):
                 annotation, annotation3D, cat, num_keypoints, types = anno
-                xCoords = np.array(annotation)[1:, 0]
-                yCoords = np.array(annotation)[1:, 1]
-                bbox = [int(np.min(xCoords)*width), int(np.min(yCoords)*height), int(np.max(xCoords)*width), int(np.max(yCoords)*height)]
+                if len(annotation) == 0:
+                    bbox = []
+                else:
+                    xCoords = np.array(annotation)[1:, 0]
+                    yCoords = np.array(annotation)[1:, 1]
+                
+                    bbox = [int(np.min(xCoords)*width), int(np.min(yCoords)*height), int(np.max(xCoords)*width), int(np.max(yCoords)*height)]
                 bboxAnnotations += [bbox]
 
             
@@ -280,14 +284,15 @@ if __name__ == "__main__":
             ################################ save results and visualise if set to true
             for frameIdx, (vis_frame, predictions) in enumerate(allVisFrames):
                 allResults[video_input][frameIdx] = {}
+                if len(predictions['instances']) == 0:
+                    continue
                 allResults[video_input][frameIdx]['scores'] = predictions['instances'].scores.cpu().tolist()
                 allResults[video_input][frameIdx]['pred_classes'] =  predictions['instances'].pred_classes.cpu().tolist()
                 allResults[video_input][frameIdx]['boxes'] =  predictions['instances'].pred_boxes.tensor.cpu().tolist()
 
-                # allResults[video_input][frameIdx]['allFeatures'] =  predictions['allFeatures'].cpu().tolist()
                 allResults[video_input][frameIdx]['predIndices'] =  predictions['predIndices'][0].cpu().tolist()
-                feats = predictions['allFeatures'][predictions['predIndices']]
-                allResults[video_input][frameIdx]['feats'] = feats.cpu().tolist()
+                allResults[video_input][frameIdx]['features'] = predictions['features'].cpu().tolist()
+               
                 bbox = bboxAnnotations[frameIdx]
                 allResults[video_input][frameIdx]['gtBox'] =  bbox
 
