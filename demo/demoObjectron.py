@@ -310,7 +310,7 @@ if __name__ == "__main__":
                     bboxes += [bbox]
                 bboxAnnotations += [bboxes]
             print(eulerAngles[:5])
-            print(expectedNm)
+            print(video_input)
             exit()
             ################################ run on frames and get video
             allVisFrames = demo.run_on_video(video, bboxAnnotations)
