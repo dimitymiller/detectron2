@@ -278,7 +278,7 @@ if __name__ == "__main__":
                 eA = []
                 for instIdx in range(num_instances):
                      #object transform in the world frame
-                    obj_rotation, obj_translation, obj_scale, ks = allInstances[intIdx]
+                    obj_rotation, obj_translation, obj_scale, ks = allInstances[instIdx]
 
                     objworld_transformation = np.identity(4)
 
