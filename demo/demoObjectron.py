@@ -268,7 +268,7 @@ if __name__ == "__main__":
             quatAngles = []
             
             for annoIdx, anno in enumerate(allAnnotations):
-                points_2d, points_3d, num_keypoints, frame_view_matrix, frame_projection_matrix, intrinsics = allAnnotations[frame_id]
+                points_2d, points_3d, num_keypoints, frame_view_matrix, frame_projection_matrix, intrinsics = anno
                 num_instances = len(num_keypoints)
 
                 keypoints = np.split(points_2d, np.array(np.cumsum(num_keypoints)))
