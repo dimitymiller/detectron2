@@ -243,10 +243,6 @@ if __name__ == "__main__":
 
         ################################################################ go through every video in this batch
         for idx, video_input in enumerate(tqdm.tqdm([baseFolder+'{}/video.MOV'.format(i) for i in folderPaths], total = len(folderPaths))):
-            if 'batch-1/15/' not in video_input:
-                continue
-            print(video_input)
-            
             if args.batch != None and args.vidNum != None:
                 expectedNm = f'batch-{args.batch}/{args.vidNum}'
                 if expectedNm != folderPaths[idx]:
