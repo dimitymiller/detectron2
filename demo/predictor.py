@@ -326,7 +326,7 @@ class VisualizationDemoObjectron(object):
                             print(ious)
                             
                             mask1 = ious >= 0.2
-                            mask2 = overlap[mask] >= 0.8
+                            mask2 = overlap >= 0.8
                             print(mask1*mask2)
                             totalMask += mask1
                             print(mask1, mask2)
