@@ -329,7 +329,9 @@ class VisualizationDemoObjectron(object):
                             mask2 = overlap >= 0.8
                             mask = mask1*mask2
                             totalMask += mask
-            
+                        print(totalMask)
+                        print(totalMask.bool())
+                        totalMask = totalMask.bool()
                         print(torch.sum(totalMask), len(mask1))
                         predictions['instances'] = predictions['instances'][totalMask]
                         predictions['features'] = feats[totalMask]
