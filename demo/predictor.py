@@ -152,30 +152,35 @@ class VisualizationDemoObjectron(object):
         else:
             self.predictor = DefaultPredictor(cfg)
 
-    def bbox_iou(self, gtBox, predBoxes, epsilon=1e-5):
-        gtBoxes = gtBox.repeat(len(predBoxes), 1)
-        x1 = torch.max(torch.cat((gtBoxes[:, 0].unsqueeze(1), predBoxes[:, 0].unsqueeze(1)), dim = 1), dim = 1)[0]
-        y1 = torch.max(torch.cat((gtBoxes[:, 1].unsqueeze(1), predBoxes[:, 1].unsqueeze(1)), dim = 1), dim = 1)[0]
-        x2 = torch.min(torch.cat((gtBoxes[:, 2].unsqueeze(1), predBoxes[:, 2].unsqueeze(1)), dim = 1), dim = 1)[0]
-        y2 = torch.min(torch.cat((gtBoxes[:, 3].unsqueeze(1), predBoxes[:, 3].unsqueeze(1)), dim = 1), dim = 1)[0]
+    def bbox_iou(self, allGtBox, predBoxes, epsilon=1e-5):
+        allIou = []
+        allArea = []
+        for gtBox in allGtBox:
+            gtBoxes = gtBox.repeat(len(predBoxes), 1)
+            x1 = torch.max(torch.cat((gtBoxes[:, 0].unsqueeze(1), predBoxes[:, 0].unsqueeze(1)), dim = 1), dim = 1)[0]
+            y1 = torch.max(torch.cat((gtBoxes[:, 1].unsqueeze(1), predBoxes[:, 1].unsqueeze(1)), dim = 1), dim = 1)[0]
+            x2 = torch.min(torch.cat((gtBoxes[:, 2].unsqueeze(1), predBoxes[:, 2].unsqueeze(1)), dim = 1), dim = 1)[0]
+            y2 = torch.min(torch.cat((gtBoxes[:, 3].unsqueeze(1), predBoxes[:, 3].unsqueeze(1)), dim = 1), dim = 1)[0]
 
-        width = (x2-x1)
-        height = (y2-y1)
+            width = (x2-x1)
+            height = (y2-y1)
 
-        width[width < 0] = 0
-        height[height < 0] = 0
+            width[width < 0] = 0
+            height[height < 0] = 0
 
-        area_overlap = width*height
+            area_overlap = width*height
 
-        area_a = (gtBoxes[:, 2] - gtBoxes[:, 0]) * (gtBoxes[:, 3] - gtBoxes[:, 1])
-        area_b = (predBoxes[:, 2] - predBoxes[:, 0]) * (predBoxes[:, 3] - predBoxes[:, 1])
-        area_combined = area_a + area_b - area_overlap
+            area_a = (gtBoxes[:, 2] - gtBoxes[:, 0]) * (gtBoxes[:, 3] - gtBoxes[:, 1])
+            area_b = (predBoxes[:, 2] - predBoxes[:, 0]) * (predBoxes[:, 3] - predBoxes[:, 1])
+            area_combined = area_a + area_b - area_overlap
 
-        iou = area_overlap/ (area_combined + epsilon)
+            iou = area_overlap/ (area_combined + epsilon)
 
-        includedArea = (area_overlap)/area_b
-        return iou, includedArea
-
+            includedArea = (area_overlap)/area_b
+            allIou += [iou]
+            allArea += [includedArea]
+        return allIou, allArea
+    
     def run_on_image(self, image):
         """
         Args:
