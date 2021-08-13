@@ -29,6 +29,7 @@ from objectron.dataset import graphics
 
 from os import path as osp
 import json
+from scipy.spatial.transform import Rotation as R
 
 # constants
 WINDOW_NAME = "COCO detections"
@@ -146,52 +147,55 @@ def get_anno(ann_path):
 
     return ann
 
-
-#taken from objectron github
-def get_frame_annotation(sequence, frame_id):
+def get_frame_annotation(annotation_filename):
     """Grab an annotated frame from the sequence."""
-    data = sequence.frame_annotations[frame_id]
-    object_id = 0
-    object_keypoints_2d = []
-    object_keypoints_3d = []
-    object_rotations = []
-    object_translations = []
-    object_scale = []
-    num_keypoints_per_object = []
-    object_categories = []
-    annotation_types = []
-    # Get the camera for the current frame. We will use the camera to bring
-    # the object from the world coordinate to the current camera coordinate.
-    camera = np.array(data.camera.transform).reshape(4, 4)
-    for obj in sequence.objects:
-        rotation = np.array(obj.rotation).reshape(3, 3)
-        translation = np.array(obj.translation)
-        object_scale.append(np.array(obj.scale))
-        transformation = np.identity(4)
-        transformation[:3, :3] = rotation
-        transformation[:3, 3] = translation
-        obj_cam = np.matmul(camera, transformation)
-        object_translations.append(obj_cam[:3, 3])
-        object_rotations.append(obj_cam[:3, :3])
-        object_categories.append(obj.category)
+    result = []
+    instances = []
+    with open(annotation_filename, 'rb') as pb:
+        sequence = annotation_protocol.Sequence()
+        sequence.ParseFromString(pb.read())
 
-        annotation_types.append(obj.type)
+        object_id = 0
+        object_rotations = []
+        object_translations = []
+        object_scale = []
+        num_keypoints_per_object = []
+        object_categories = []
+        annotation_types = []
+        
+        # Object instances in the world coordinate system, These are stored per sequence, 
+        # To get the per-frame version, grab the transformed keypoints from each frame_annotation
+        for obj in sequence.objects:
+            rotation = np.array(obj.rotation).reshape(3, 3)
+            translation = np.array(obj.translation)
+            scale = np.array(obj.scale)
+            points3d = np.array([[kp.x, kp.y, kp.z] for kp in obj.keypoints])
+            instances.append((rotation, translation, scale, points3d))
+        
+        # Grab teh annotation results per frame
+        for data in sequence.frame_annotations:
+            # Get the camera for the current frame. We will use the camera to bring
+            # the object from the world coordinate to the current camera coordinate.
+            transform = np.array(data.camera.transform).reshape(4, 4)
+            view = np.array(data.camera.view_matrix).reshape(4, 4)
+            intrinsics = np.array(data.camera.intrinsics).reshape(3, 3)
+            projection = np.array(data.camera.projection_matrix).reshape(4, 4)
 
-    keypoint_size_list = []
-    for annotations in data.annotations:
-        num_keypoints = len(annotations.keypoints)
-        keypoint_size_list.append(num_keypoints)
-        for keypoint_id in range(num_keypoints):
-            keypoint = annotations.keypoints[keypoint_id]
-            object_keypoints_2d.append(
-                (keypoint.point_2d.x, keypoint.point_2d.y, keypoint.point_2d.depth))
-            object_keypoints_3d.append(
-                (keypoint.point_3d.x, keypoint.point_3d.y, keypoint.point_3d.z))
-        num_keypoints_per_object.append(num_keypoints)
-        object_id += 1
+            keypoint_size_list = []
+            object_keypoints_2d = []
+            object_keypoints_3d = []
+            for annotations in data.annotations:
+                num_keypoints = len(annotations.keypoints)
+                keypoint_size_list.append(num_keypoints)
+                for keypoint_id in range(num_keypoints):
+                    keypoint = annotations.keypoints[keypoint_id]
+                    object_keypoints_2d.append((keypoint.point_2d.x, keypoint.point_2d.y, keypoint.point_2d.depth))
+                    object_keypoints_3d.append((keypoint.point_3d.x, keypoint.point_3d.y, keypoint.point_3d.z))
+                num_keypoints_per_object.append(num_keypoints)
+                object_id += 1
+            result.append((object_keypoints_2d, object_keypoints_3d, keypoint_size_list, view, projection, intrinsics))
 
-    return [object_keypoints_2d, object_keypoints_3d, object_categories, keypoint_size_list,
-            annotation_types]
+    return result, instances
 
 
 def load_annotation_sequence(annotation_file):
@@ -249,8 +253,8 @@ if __name__ == "__main__":
             
             ################################################################ get annotation and video
             allResults[video_input] = {}
-            allAnnotations = get_anno(f'../../data/objectron/annotations/{args.object}/{folderPaths[idx]}.pbdata')
-
+            allAnnotations, allInstances = get_frame_annotation(f'../../data/objectron/annotations/{args.object}/{folderPaths[idx]}.pbdata')
+            
             video = cv2.VideoCapture(video_input)
            
             width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -260,18 +264,54 @@ if __name__ == "__main__":
 
             ############################################################## extract a rough 2D bounding boxes from annotation
             bboxAnnotations = []
-            for annoIdx, anno in enumerate(allAnnotations):
-                annotation, annotation3D, cat, num_keypoints, types = anno
-                if len(annotation) == 0:
-                    bbox = []
-                else:
-                    xCoords = np.array(annotation)[1:, 0]
-                    yCoords = np.array(annotation)[1:, 1]
-                
-                    bbox = [int(np.min(xCoords)*width), int(np.min(yCoords)*height), int(np.max(xCoords)*width), int(np.max(yCoords)*height)]
-                bboxAnnotations += [bbox]
-
+            eulerAngles = []
+            quatAngles = []
             
+            for annoIdx, anno in enumerate(allAnnotations):
+                points_2d, points_3d, num_keypoints, frame_view_matrix, frame_projection_matrix, intrinsics = annotation_data[frame_id]
+                num_instances = len(num_keypoints)
+
+                keypoints = np.split(points_2d, np.array(np.cumsum(num_keypoints)))
+                keypoints = [points.reshape(-1, 3) for points in keypoints][:-1]
+                
+                qA = []
+                eA = []
+                for instIdx in range(num_instances):
+                     #object transform in the world frame
+                    obj_rotation, obj_translation, obj_scale, ks = allInstances[intIdx]
+
+                    objworld_transformation = np.identity(4)
+
+                    objworld_transformation[:3, :3] = obj_rotation
+                    objworld_transformation[:3, 3] = obj_translation
+
+                    transformMatrix = np.matmul(frame_view_matrix, objworld_transformation)
+                    rotationMatrix = transformMatrix[:3, :3]
+
+                    r = R.from_matrix(rotationMatrix)
+                    eulerAnglesA = r.as_euler('ZXY', degrees=False).tolist()
+                    quaternionAnglesA = r.as_quat().tolist()
+                    
+                    qA += [quaternionAnglesA]
+                    eA += [eulerAnglesA]
+                
+                eulerAngles += [eA]
+                quatAngles += [qA]
+                
+                bboxes = []
+                for k in keypoints:
+                    if len(k) == 0:
+                        bbox = []
+                    else:
+                        xCoords = np.array(k)[1:, 0]
+                        yCoords = np.array(k)[1:, 1]
+
+                        bbox = [int(np.min(xCoords)*width), int(np.min(yCoords)*height), int(np.max(xCoords)*width), int(np.max(yCoords)*height)]
+                    bboxes += [bbox]
+                bboxAnnotations += [bboxes]
+            print(eulerAngles[:5])
+            print(expectedNm)
+            exit()
             ################################ run on frames and get video
             allVisFrames = demo.run_on_video(video, bboxAnnotations)
 
@@ -283,6 +323,8 @@ if __name__ == "__main__":
 
             ################################ save results and visualise if set to true
             for frameIdx, (vis_frame, predictions) in enumerate(allVisFrames):
+                
+                
                 allResults[video_input][frameIdx] = {}
                 if len(predictions['instances']) == 0:
                     continue
@@ -294,7 +336,9 @@ if __name__ == "__main__":
                 allResults[video_input][frameIdx]['features'] = predictions['features'].cpu().tolist()
                
                 bbox = bboxAnnotations[frameIdx]
-                allResults[video_input][frameIdx]['gtBox'] =  bbox
+                allResults[video_input][frameIdx]['gtBoxes'] =  bbox
+                allResults[video_input][frameIdx]['euler'] =  eulerAngles[frameIdx]
+                allResults[video_input][frameIdx]['quaternion'] =  quatAngles[frameIdx]
 
                 allCols = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255)]
                 if args.visSave:
