@@ -321,8 +321,8 @@ class VisualizationDemoObjectron(object):
                         predictions['instances'] = []
                     else:
                         totalMask = torch.zeros(predictions['instances'].pred_boxes.tensor.size(0))
-                        for g in gt[frameIdx]
-                            ious, overlap = self.bbox_iou(torch.Tensor(gt[frameIdx]).cuda(), predictions['instances'].pred_boxes.tensor)
+                        for g in gt[frameIdx]:
+                            ious, overlap = self.bbox_iou(torch.Tensor(g).cuda(), predictions['instances'].pred_boxes.tensor)
                             print(ious)
                             
                             mask = ious >= 0.2
