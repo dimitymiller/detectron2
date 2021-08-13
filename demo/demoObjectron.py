@@ -243,6 +243,10 @@ if __name__ == "__main__":
 
         ################################################################ go through every video in this batch
         for idx, video_input in enumerate(tqdm.tqdm([baseFolder+'{}/video.MOV'.format(i) for i in folderPaths], total = len(folderPaths))):
+            if 'batch-1/7/' not in video_input:
+                continue
+            print(video_input)
+            
             if args.batch != None and args.vidNum != None:
                 expectedNm = f'batch-{args.batch}/{args.vidNum}'
                 if expectedNm != folderPaths[idx]:
@@ -309,9 +313,7 @@ if __name__ == "__main__":
                         bbox = [int(np.min(xCoords)*width), int(np.min(yCoords)*height), int(np.max(xCoords)*width), int(np.max(yCoords)*height)]
                     bboxes += [bbox]
                 bboxAnnotations += [bboxes]
-            print(eulerAngles[:5])
-            print(video_input)
-            exit()
+      
             ################################ run on frames and get video
             allVisFrames = demo.run_on_video(video, bboxAnnotations)
 
