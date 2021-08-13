@@ -334,7 +334,6 @@ if __name__ == "__main__":
                 allResults[video_input][frameIdx]['pred_classes'] =  predictions['instances'].pred_classes.cpu().tolist()
                 allResults[video_input][frameIdx]['boxes'] =  predictions['instances'].pred_boxes.tensor.cpu().tolist()
 
-                allResults[video_input][frameIdx]['predIndices'] =  predictions['predIndices'][0].cpu().tolist()
                 allResults[video_input][frameIdx]['features'] = predictions['features'].cpu().tolist()
                
                 bbox = bboxAnnotations[frameIdx]
