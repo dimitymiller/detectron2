@@ -152,7 +152,7 @@ class VisualizationDemoObjectron(object):
         else:
             self.predictor = DefaultPredictor(cfg)
 
-    def bbox_iou(self, allGtBox, predBoxes, epsilon=1e-5):
+    def bbox_iou(self, gtBox, predBoxes, epsilon=1e-5):
         
         gtBoxes = gtBox.repeat(len(predBoxes), 1)
         x1 = torch.max(torch.cat((gtBoxes[:, 0].unsqueeze(1), predBoxes[:, 0].unsqueeze(1)), dim = 1), dim = 1)[0]
