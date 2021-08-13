@@ -313,8 +313,7 @@ class VisualizationDemoObjectron(object):
 
                 feats = box_features[pred_inds]
                 predictions['features'] = []
-                # predictions['allFeatures'] = box_features
-                predictions['predIndices'] = pred_inds
+
                 if gt != None and len(predictions['instances'].scores) > 0:
                     #iou greater than 0.2 and at least 80% of mass inside
                     if len(gt[frameIdx]) == 0:
@@ -329,13 +328,11 @@ class VisualizationDemoObjectron(object):
                             mask2 = overlap >= 0.8
                             mask = mask1*mask2
                             totalMask += mask
-                        print(totalMask)
-                        print(totalMask.bool())
+
                         totalMask = totalMask.bool()
-                        print(torch.sum(totalMask), len(mask1))
+
                         predictions['instances'] = predictions['instances'][totalMask]
-                        predictions['features'] = feats[totalMask]
-                    
+                        predictions['features'] = feats[totalMask]                  
                    
                 yield frame, predictions#process_predictions(frame, predictions)
 
