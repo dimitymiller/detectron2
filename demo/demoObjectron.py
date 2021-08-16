@@ -307,6 +307,10 @@ if __name__ == "__main__":
                         yCoords = np.array(k)[1:, 1]
 
                         bbox = [int(np.min(xCoords)*width), int(np.min(yCoords)*height), int(np.max(xCoords)*width), int(np.max(yCoords)*height)]
+                        bbox[0] = np.max([0, bbox[0]])
+                        bbox[1] = np.max([0, bbox[1]])
+                        bbox[2] = np.min([width, bbox[2]])
+                        bbox[3] = np.min([height, bbox[3]])
                     bboxes += [bbox]
                 bboxAnnotations += [bboxes]
       
@@ -321,22 +325,20 @@ if __name__ == "__main__":
 
             ################################ save results and visualise if set to true
             for frameIdx, (vis_frame, predictions) in enumerate(allVisFrames):
-                
-                
                 allResults[video_input][frameIdx] = {}
-                if len(predictions['instances']) == 0:
-                    continue
-                allResults[video_input][frameIdx]['scores'] = predictions['instances'].scores.cpu().tolist()
-                allResults[video_input][frameIdx]['pred_classes'] =  predictions['instances'].pred_classes.cpu().tolist()
-                allResults[video_input][frameIdx]['boxes'] =  predictions['instances'].pred_boxes.tensor.cpu().tolist()
-
-                allResults[video_input][frameIdx]['features'] = predictions['features'].cpu().tolist()
-               
                 bbox = bboxAnnotations[frameIdx]
                 allResults[video_input][frameIdx]['gtBoxes'] =  bbox
                 allResults[video_input][frameIdx]['euler'] =  eulerAngles[frameIdx]
                 allResults[video_input][frameIdx]['quaternion'] =  quatAngles[frameIdx]
 
+                if len(predictions['instances']) == 0:
+                    continue
+                allResults[video_input][frameIdx]['scores'] = predictions['instances'].scores.cpu().tolist()
+                allResults[video_input][frameIdx]['pred_classes'] =  predictions['instances'].pred_classes.cpu().tolist()
+                allResults[video_input][frameIdx]['boxes'] =  predictions['instances'].pred_boxes.tensor.cpu().tolist()
+                allResults[video_input][frameIdx]['detAssociation'] = predictions['detAssociation'].cpu().tolist()
+                allResults[video_input][frameIdx]['features'] = predictions['features'].cpu().tolist()
+               
                 allCols = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255)]
                 if args.visSave:
                     strList = []
