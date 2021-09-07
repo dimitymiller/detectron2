@@ -78,6 +78,12 @@ def get_parser():
         help="Which object in objectron are we testing?",
     )
     parser.add_argument(
+        "--split",
+        type=str,
+        default='train',
+        help="Which split of data - train or test?",
+    )
+    parser.add_argument(
         "--dataSave",
         type=bool,
         default=False,
@@ -218,7 +224,7 @@ if __name__ == "__main__":
     logger.info("Arguments: " + str(args))
 
     cfg = setup_cfg(args)
-
+    
     demo = VisualizationDemoObjectron(cfg)
     
     baseFolder = f'../../data/objectron/videos/{args.object}/'
@@ -238,7 +244,7 @@ if __name__ == "__main__":
             if bNum != args.batch:
                 continue
         bName = f'batch-{bNum}'
-        folderPaths = get_paths(data_root, 'train', args.object, bName)
+        folderPaths = get_paths(data_root, args.split, args.object, bName)
         allResults = {}
 
         ################################################################ go through every video in this batch
@@ -264,39 +270,28 @@ if __name__ == "__main__":
 
             ############################################################## extract a rough 2D bounding boxes from annotation
             bboxAnnotations = []
-            eulerAngles = []
-            quatAngles = []
+            allResults[video_input]['object_transforms'] = {}
             
+            objAnnotations = []
+            for obI, ins in enumerate(allInstances):
+                obj_rotation, obj_translation, obj_scale, ks = ins
+                allResults[video_input]['object_transforms'][obI] = [obj_rotation.tolist(), obj_translation.tolist(), obj_scale.tolist()]
+               
+            cameraFrameViews = []
+            cameraFrameProjections = []
+            cameraIntrinsics = []
             for annoIdx, anno in enumerate(allAnnotations):
                 points_2d, points_3d, num_keypoints, frame_view_matrix, frame_projection_matrix, intrinsics = anno
                 num_instances = len(num_keypoints)
 
+                cameraFrameViews += [frame_view_matrix.tolist()]
+                cameraFrameProjections += [frame_projection_matrix.tolist()]
+                cameraIntrinsics += [intrinsics.tolist()]
+
+              
                 keypoints = np.split(points_2d, np.array(np.cumsum(num_keypoints)))
                 keypoints = [points.reshape(-1, 3) for points in keypoints][:-1]
                 
-                qA = []
-                eA = []
-                for instIdx in range(num_instances):
-                     #object transform in the world frame
-                    obj_rotation, obj_translation, obj_scale, ks = allInstances[instIdx]
-
-                    objworld_transformation = np.identity(4)
-
-                    objworld_transformation[:3, :3] = obj_rotation
-                    objworld_transformation[:3, 3] = obj_translation
-
-                    transformMatrix = np.matmul(frame_view_matrix, objworld_transformation)
-                    rotationMatrix = transformMatrix[:3, :3]
-
-                    r = R.from_matrix(rotationMatrix)
-                    eulerAnglesA = r.as_euler('ZXY', degrees=False).tolist()
-                    quaternionAnglesA = r.as_quat().tolist()
-                    
-                    qA += [quaternionAnglesA]
-                    eA += [eulerAnglesA]
-                
-                eulerAngles += [eA]
-                quatAngles += [qA]
                 
                 bboxes = []
                 for k in keypoints:
@@ -307,13 +302,13 @@ if __name__ == "__main__":
                         yCoords = np.array(k)[1:, 1]
 
                         bbox = [int(np.min(xCoords)*width), int(np.min(yCoords)*height), int(np.max(xCoords)*width), int(np.max(yCoords)*height)]
-                        bbox[0] = np.max([0, bbox[0]])
-                        bbox[1] = np.max([0, bbox[1]])
-                        bbox[2] = np.min([width, bbox[2]])
-                        bbox[3] = np.min([height, bbox[3]])
+                        bbox[0] = int(np.max([0, bbox[0]]))
+                        bbox[1] = int(np.max([0, bbox[1]]))
+                        bbox[2] = int(np.min([width, bbox[2]]))
+                        bbox[3] = int(np.min([height, bbox[3]]))
                     bboxes += [bbox]
                 bboxAnnotations += [bboxes]
-      
+            
             ################################ run on frames and get video
             allVisFrames = demo.run_on_video(video, bboxAnnotations)
 
@@ -328,11 +323,14 @@ if __name__ == "__main__":
                 allResults[video_input][frameIdx] = {}
                 bbox = bboxAnnotations[frameIdx]
                 allResults[video_input][frameIdx]['gtBoxes'] =  bbox
-                allResults[video_input][frameIdx]['euler'] =  eulerAngles[frameIdx]
-                allResults[video_input][frameIdx]['quaternion'] =  quatAngles[frameIdx]
+                allResults[video_input][frameIdx]['camera'] =  {}
+                allResults[video_input][frameIdx]['camera']['frame_view'] = cameraFrameViews[frameIdx]
+                allResults[video_input][frameIdx]['camera']['frame_projection'] = cameraFrameProjections[frameIdx]
+                allResults[video_input][frameIdx]['camera']['intrinsics'] = cameraIntrinsics[frameIdx]
 
                 if len(predictions['instances']) == 0:
                     continue
+
                 allResults[video_input][frameIdx]['scores'] = predictions['instances'].scores.cpu().tolist()
                 allResults[video_input][frameIdx]['pred_classes'] =  predictions['instances'].pred_classes.cpu().tolist()
                 allResults[video_input][frameIdx]['boxes'] =  predictions['instances'].pred_boxes.tensor.cpu().tolist()
@@ -369,11 +367,12 @@ if __name__ == "__main__":
                         break  # k to break
                     if k == 27:
                         exit()  # esc to quit
-
+                
 
         ####################### save data
         if args.dataSave:
-            with open(f'../../results/objectron/raw/{args.object}/{bName}wFeaturesTrainData.json', 'w') as f:
+            
+            with open(f'../../results/objectron/raw/{args.object}/{bName}wFeatures{args.split}Data.json', 'w') as f:
                 json.dump(allResults, f)
 
         video.release()
