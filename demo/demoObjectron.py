@@ -254,7 +254,7 @@ if __name__ == "__main__":
                 if expectedNm != folderPaths[idx]:
                     continue
        
-            
+            basename = video_input
             
             
             ################################################################ get annotation and video
@@ -312,7 +312,7 @@ if __name__ == "__main__":
             ################################ run on frames and get video
             allVisFrames = demo.run_on_video(video, bboxAnnotations)
 
-
+            
 
             if args.visSave:
                 cv2.namedWindow(basename, cv2.WINDOW_NORMAL)
@@ -336,17 +336,18 @@ if __name__ == "__main__":
                 allResults[video_input][frameIdx]['boxes'] =  predictions['instances'].pred_boxes.tensor.cpu().tolist()
                 allResults[video_input][frameIdx]['detAssociation'] = predictions['detAssociation'].cpu().tolist()
                 allResults[video_input][frameIdx]['features'] = predictions['features'].cpu().tolist()
+                allResults[video_input][frameIdx]['logits'] = predictions['logits'].cpu().tolist()
                
                 allCols = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255)]
                 if args.visSave:
                     strList = []
                     strColors = []
                     for bIdx, bbox in enumerate(predictions['instances'].pred_boxes.tensor.cpu().tolist()):
-                        vis_frame = cv2.rectangle(vis_frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), allCols[bIdx], 3)
-                        clsLbl = COCO_Labels[predictions['instances'].pred_classes.cpu().tolist()[bIdx]]
-                        clsScore = predictions['instances'].scores.cpu().tolist()[bIdx]
+                        vis_frame = cv2.rectangle(vis_frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), allCols[bIdx%4], 3)
+                        clsLbl = COCO_Labels[predictions['instances'].pred_classes.cpu().tolist()[bIdx%4]]
+                        clsScore = predictions['instances'].scores.cpu().tolist()[bIdx%4]
                         strList += [f'{clsLbl} : {clsScore:.2f}']
-                        strColors += [allCols[bIdx]]
+                        strColors += [allCols[bIdx%4]]
 
                     # annotation, annotation3D, cat, num_keypoints, types = allAnnotations[frameIdx]
                     # vis_frame = graphics.draw_annotation_on_image(vis_frame, annotation, num_keypoints)
@@ -360,19 +361,20 @@ if __name__ == "__main__":
                               
                     cv2.imshow(basename, vis_frame)
                     fName = folderPaths[idx].replace('/', '-')
-                    cv2.imwrite(f'demoFigures/{fName}/outFrame{frameIdx}.jpg', vis_frame)
-                    k = cv2.waitKey(1)
+                    # cv2.imwrite(f'demoFigures/{fName}/outFrame{frameIdx}.jpg', vis_frame)
+                    
+                    k = cv2.waitKey(100)
                     
                     if k == 107:
                         break  # k to break
                     if k == 27:
                         exit()  # esc to quit
-                
+                    # exit()
 
         ####################### save data
         if args.dataSave:
             
-            with open(f'../../results/objectron/raw/{args.object}/{bName}wFeatures{args.split}Data.json', 'w') as f:
+            with open(f'../../results/objectron/raw/{args.object}/{bName}wFeaturesLogits{args.split}Data.json', 'w') as f:
                 json.dump(allResults, f)
 
         video.release()

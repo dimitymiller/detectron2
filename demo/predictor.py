@@ -306,13 +306,20 @@ class VisualizationDemoObjectron(object):
                 box_features = self.predictor.model.roi_heads.box_head(box_features)  # features of all 1k candidates
                 
                 predictions = self.predictor.model.roi_heads.box_predictor(box_features)
+                distributions = predictions[0]
+               
                 pred_instances, pred_inds = self.predictor.model.roi_heads.box_predictor.inference(predictions, proposals)
+                
                 pred_instances = self.predictor.model.roi_heads.forward_with_given_boxes(features, pred_instances)
+                
                 # output boxes, masks, scores, etc
                 predictions = self.predictor.model._postprocess(pred_instances, inputs, images.image_sizes)[0]  # scale box to orig size
 
                 feats = box_features[pred_inds]
+                logits = distributions[pred_inds]
+                
                 predictions['features'] = []
+                predictions['logits'] = []
 
                 if gt != None and len(predictions['instances'].scores) > 0:
                     #iou greater than 0.2 and at least 80% of mass inside
@@ -325,7 +332,7 @@ class VisualizationDemoObjectron(object):
                             ious, overlap = self.bbox_iou(torch.Tensor(g).cuda(), predictions['instances'].pred_boxes.tensor)
    
                         
-                            mask1 = ious >= 0.2
+                            mask1 = ious >= 0.20
                             
                             mask2 = overlap >= 0.8
                             mask = mask1*mask2
@@ -338,6 +345,8 @@ class VisualizationDemoObjectron(object):
                         predictions['instances'] = predictions['instances'][totalMask]
                         predictions['detAssociation'] = detMask[totalMask]                  
                         predictions['features'] = feats[totalMask]                  
+                        predictions['logits'] = logits[totalMask]   
+                                    
                    
                 yield frame, predictions#process_predictions(frame, predictions)
 
